@@ -1,7 +1,29 @@
 const express = require('express');
 const app = express();
+const crypto = require('crypto');
 
 app.use(express.json());
+
+// Encryption and Decryption settings
+const algorithm = 'aes-256-cbc';
+const key = crypto.randomBytes(32); // Use a secure key
+const iv = crypto.randomBytes(16); // Initialization vector
+
+// Function to encrypt code
+function encrypt(text) {
+  const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return { iv: iv.toString('hex'), encryptedData: encrypted };
+}
+
+// Function to decrypt code
+function decrypt(encryptedData, iv) {
+  const decipher = crypto.createDecipheriv(algorithm, Buffer.from(key), Buffer.from(iv, 'hex'));
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
 
 // Defined an array of users (not necessary but for practice reasons)
 let users = [
@@ -91,10 +113,12 @@ app.post('/snippets', (req, res) => {
         return res.status(400).json({ message: 'Invalid request' });
     }
 
+    const encryptedCode = encrypt(code); // addition to encrypt from workshop 2
+
     const newSnippet = {
         id: snippets.length + 1,
         language,
-        code,
+        code: encryptedCode, // addition to encrypt from workshop 2
     };
 
     snippets.push(newSnippet);
@@ -105,12 +129,19 @@ app.post('/snippets', (req, res) => {
 app.get('/snippets', (req, res,) => {
     const { language } = req.query;
 
+    const decryptedSnippet = snippets.map(snippet => ({
+        id: snippet.id,
+        language: snippet.language,
+        code: decrypt(snippet.code.encryptedData, snippet.code.iv) // addition to decrypt from workshop 2  
+    }));
+
     if (language) {
-        const filterSnippets = snippets.filter(snippet => snippet.language.toLocaleLowerCase() === language.toLocaleLowerCase());
+        const filterSnippets = snippets.filter(snippet => 
+        snippet.language.toLocaleLowerCase() === language.toLocaleLowerCase());
         return res.json(filterSnippets);
     }
 
-    res.json(snippets);
+    res.json(decryptedSnippet);
 });
 
 // GET a single snippet by ID
@@ -122,7 +153,13 @@ app.get('/snippets/:id', (req, res) => {
         return res.status(404).json({ message: 'Snippet not found' });
     }
 
-    res.json(snippet);
+    const decryptedSnippet = {
+        id: snippet.id,
+        language: snippet.language,
+        code: decrypt(snippet.code.encryptedData, snippet.code.iv) // addition to decrypt from workshop 2  
+    };
+
+    res.json(decryptedSnippet);
 });
 
 const PORT = 3000;
