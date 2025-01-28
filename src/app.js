@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 
 app.use(express.json());
 
@@ -103,6 +104,33 @@ app.get('/users/:id', (req, res) => {
     }
 
     res.json(user);
+});
+
+// POST endpoint to authenticate a user
+app.post('/user', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' }); // if theres no email or password, throws error message
+  }
+
+  // process to hash (encrypt) the password
+  const saltRounds = 10; // sets salt to 10 
+  try {
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newUser = {
+      id: users.length + 1,
+      email,
+      password: hashedPassword, // stores the hashed password
+    };
+
+    users.push(newUser);
+    res.status(201).json({ message: 'User successfully created' });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Error creating user', error: error.message });
+  }
 });
 
 // POST endpoints to create a new snippet
