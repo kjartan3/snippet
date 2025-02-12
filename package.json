@@ -11,7 +11,8 @@
   "description": "",
   "dependencies": {
     "bcrypt": "^5.1.1",
-    "express": "^4.21.2"
-  },
-  "devDependencies": {}
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
 }

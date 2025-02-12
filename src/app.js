@@ -2,11 +2,13 @@ const express = require('express');
 const app = express();
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 app.use(express.json());
 
 // Encryption and Decryption settings
 const algorithm = 'aes-256-cbc';
+const JWT_SECRET = 'one_piece_secret';
 const key = crypto.randomBytes(32); // Use a secure key
 const iv = crypto.randomBytes(16); // Initialization vector
 
@@ -25,6 +27,22 @@ function decrypt(encryptedData, iv) {
   decrypted += decipher.final('utf8');
   return decrypted;
 }
+
+const verifyToken = (res, req, next) => {
+    const token = req.headers['authorization']?.split(' ')[1]; // Get token from Authorization header
+
+    if (!token) {
+        return res.status(403).json({ message: 'No token provided' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        req.userId = decoded.id; // Attach user ID to request
+        next();
+    });
+};
 
 // Defined an array of users (not necessary but for practice reasons)
 let users = [
@@ -133,8 +151,34 @@ app.post('/user', async (req, res) => {
   }
 });
 
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    // Find the user by email
+    const user = users.find(user => user.email === email);
+    if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Check if the password is correct
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Create JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+
+    // Send token to user
+    res.json({ token });
+});
+
 // POST endpoints to create a new snippet
-app.post('/snippets', (req, res) => {
+app.post('/snippets', verifyToken, (req, res) => {
     const { language, code } = req.body;
 
     if (!language || !code) {
@@ -154,7 +198,7 @@ app.post('/snippets', (req, res) => {
 });
 
 // GET endpoints to retrieve all snippets
-app.get('/snippets', (req, res,) => {
+app.get('/snippets', verifyToken, (req, res,) => {
     const { language } = req.query;
 
     const decryptedSnippet = snippets.map(snippet => ({
